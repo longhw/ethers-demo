@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Ethers.js + MetaMask 演示</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.16.0/dist/ethers.umd.min.js"></script>
+</head>
+
+<body>
+  <h1>Ethers.js + MetaMask 演示</h1>
+
+  <div>
+    <button id="connectBtn">连接MetaMask</button>
+    <div id="accountInfo"></div>
+  </div>
+
+  <div>
+    <h2>合约交互</h2>
+    <p>合约地址: <span id="contractAddress">0x5FbDB2315678afecb367f032d93F642f64180aa3</span></p>
+    <p>当前值: <span id="currentValue">-</span></p>
+    <button id="incrementBtn">Increment</button>
+    <button id="setNumberBtn">Set Number</button>
+    <input type="number" id="numberInput" placeholder="输入数字" value="100">
+  </div>
+
+  <div>
+    <h2>事件日志</h2>
+    <div id="eventLog"></div>
+  </div>
+
+  <script>
+    const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3';
+    const counterAbi = [
+      "function getNumber() view returns (uint256)",
+      "function increment()",
+      "function setNumber(uint256)",
+      "event Incremented(address indexed user, uint256 newValue)",
+      "event SetNumber(address indexed user, uint256 newValue)"
+    ];
+
+    let provider, signer, contract, account;
+
+    // 连接MetaMask
+    document.getElementById('connectBtn').addEventListener('click', async () => {
+      if (typeof window.ethereum === 'undefined') {
+        alert('请安装MetaMask');
+        return;
+      }
+
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        provider = new ethers.BrowserProvider(window.ethereum);
+        signer = await provider.getSigner();
+        account = await signer.getAddress();
+
+        document.getElementById('accountInfo').innerHTML = `已连接: ${account}`;
+        document.getElementById('connectBtn').disabled = true;
+
+        // 创建合约实例
+        contract = new ethers.Contract(CONTRACT_ADDRESS, counterAbi, signer);
+
+        // 读取初始值
+        await updateValue();
+
+        // 设置事件监听
+        setupEventListeners();
+
+      } catch (error) {
+        if (error.code === 4001) {
+          alert('用户拒绝连接');
+        } else {
+          console.error('连接失败:', error);
+        }
+      }
+    });
+
+    // 更新当前值
+    async function updateValue() {
+      if (!contract) return;
+      try {
+        const value = await contract.getNumber();
+        document.getElementById('currentValue').textContent = value.toString();
+      } catch (error) {
+        console.error('读取值失败:', error);
+      }
+    }
+
+    // Increment按钮
+    document.getElementById('incrementBtn').addEventListener('click', async () => {
+      if (!contract) {
+        alert('请先连接MetaMask');
+        return;
+      }
+
+      try {
+        const tx = await contract.increment();
+        addLog('交易已发送，哈希: ' + tx.hash);
+        const receipt = await tx.wait();
+        addLog('交易确认，区块号: ' + receipt.blockNumber);
+        await updateValue();
+      } catch (error) {
+        if (error.code === 4001) {
+          addLog('用户拒绝交易');
+        } else {
+          addLog('交易失败: ' + error.message);
+        }
+      }
+    });
+
+    // Set Number按钮
+    document.getElementById('setNumberBtn').addEventListener('click', async () => {
+      if (!contract) {
+        alert('请先连接MetaMask');
+        return;
+      }
+
+      const number = document.getElementById('numberInput').value;
+      if (!number) {
+        alert('请输入数字');
+        return;
+      }
+
+      try {
+        const tx = await contract.setNumber(number);
+        addLog('交易已发送，哈希: ' + tx.hash);
+        const receipt = await tx.wait();
+        addLog('交易确认，区块号: ' + receipt.blockNumber);
+        await updateValue();
+      } catch (error) {
+        if (error.code === 4001) {
+          addLog('用户拒绝交易');
+        } else {
+          addLog('交易失败: ' + error.message);
+        }
+      }
+    });
+
+    // 设置事件监听
+    function setupEventListeners() {
+      if (!contract) return;
+
+      contract.on('Incremented', (user, newValue, event) => {
+        addLog(`Incremented事件: 用户 ${user} 新值 ${newValue.toString()}`);
+      });
+
+      contract.on('SetNumber', (user, newValue, event) => {
+        addLog(`SetNumber事件: 用户 ${user} 新值 ${newValue.toString()}`);
+      });
+    }
+
+    // 添加日志
+    function addLog(message) {
+      const log = document.getElementById('eventLog');
+      const time = new Date().toLocaleTimeString();
+      log.innerHTML += `<div>[${time}] ${message}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // 监听账户变化
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        if (accounts.length === 0) {
+          location.reload();
+        } else {
+          location.reload();
+        }
+      });
+
+      window.ethereum.on('chainChanged', () => {
+        location.reload();
+      });
+    }
+  </script>
+</body>
+
+</html>

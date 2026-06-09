@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-contract Counter {
+contract Counter2 {
     uint256 public number;
     
     event Incremented(address indexed user, uint256 newValue);
